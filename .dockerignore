@@ -1,0 +1,26 @@
+# Node.js native module cache
+node_modules
+# But keep workspace-level node_modules for pnpm
+# .pnpm-store — pnpm cache, kept separately with --mount cache
+# Build outputs to avoid re-copying on subsequent builds
+.dsh-build
+# Git metadata if using --depth 1 shallow clone
+.git
+# Editor config (optional)
+.editorconfig
+.vscode
+.idea
+# Documentation (can be mounted separately)
+DOCTOR.md
+DOCKER.md
+# Session state
+.session
+# Benchmarks and tools
+benchmarks
+packages/*/lib
+packages/*/dist
+# Python artifacts
+python/.venv
+python/venv
+# Vendor symlink targets — point them at workspace
+vendor
