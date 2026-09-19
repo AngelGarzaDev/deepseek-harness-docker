@@ -1,12 +1,24 @@
-# Docker Usage
+# DeepSeek Harness Docker
 
-This document describes building and running the DeepSeek Harness Docker image.
+Docker packaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — an AI agent framework with Web GUI, headless profiles, and native sandboxing.
+
+## Prerequisites
+
+Clone the upstream project, then apply this Dockerfile on top:
+
+```bash
+git clone https://github.com/deepseek-ai/deepseek-harness.git
+cp /path/to/dockerfile-repo/* deepseek-harness/   # Dockerfile, .dockerignore
+```
+
+Or fork and merge these files into your own copy of the repo.
 
 ## Quick Start
 
 ```bash
-# Build the image
+# From the deepseek-harness directory
 docker build -t deepseek-harness .
+```
 
 # Run with Web GUI (port 3000)
 docker run -p 3000:3000 deepseek-harness
