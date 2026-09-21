@@ -23,9 +23,10 @@ RUN corepack enable
 # Copy lockfile first for layer caching before sources
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml ./pnpm-lock.yaml
+COPY patches ./patches
 
 # Install workspace dependencies (including cross-platform esbuild binaries)
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 # Copy full source tree
