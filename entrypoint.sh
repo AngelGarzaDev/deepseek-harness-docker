@@ -13,5 +13,5 @@ dsh web --no-open --host 127.0.0.1 --port "$PORT" &
 # Wait for DSH to start listening
 sleep 2
 
-# Proxy 0.0.0.0 -> 127.0.0.1 using socat (becomes PID 1)
-exec socat TCP-LISTEN:"$PORT",reuseaddr,fork TCP:127.0.0.1:"$PORT"
+# Proxy 0.0.0.0 -> 127.0.0.1 using Node.js TCP proxy (becomes PID 1)
+exec node /usr/local/bin/proxy.js

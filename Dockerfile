@@ -9,11 +9,7 @@ LABEL org.opencontainers.image.title="DeepSeek Harness"
 LABEL org.opencontainers.image.vendor="DeepSeek"
 LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pre-published npm packages via npx"
 
-# ── Install socat for reverse proxy ──────────────────────────────────────────
-# DSH intentionally rejects --host 0.0.0.0 for safety. We bind to 127.0.0.1
-# and use socat to proxy 0.0.0.0 -> 127.0.0.1 so Docker port mapping works.
-RUN apt-get update && apt-get install -y --no-install-recommends socat \
-    && rm -rf /var/lib/apt/lists/*
+# ── No extra system deps needed — Node.js is bundled in base image ───────────
 
 # ── Pre-publish npm packages ─────────────────────────────────────────────────
 # Both packages ship pre-bundled JavaScript and static assets:
@@ -28,8 +24,9 @@ RUN addgroup --system --gid 1001 dshuser \
     && mkdir -p /home/dshuser/.dsh \
     && chown -R dshuser:dshuser /home/dshuser
 
-# ── Copy entrypoint (as root) ────────────────────────────────────────────────
+# ── Copy entrypoint and proxy script (as root) ───────────────────────────────
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY proxy.js /usr/local/bin/proxy.js
 RUN chmod 755 /usr/local/bin/entrypoint.sh
 
 # ── Switch to non-root user ─────────────────────────────────────────────────

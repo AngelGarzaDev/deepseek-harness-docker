@@ -1,5 +1,6 @@
-# Exclude everything except Dockerfile and entrypoint.sh for runtime-only image.
+# Exclude everything except Dockerfile, entrypoint.sh, and proxy.js for runtime-only image.
 # No source code is copied — npm pulls pre-published packages at build time.
 *
 !Dockerfile
 !entrypoint.sh
+!proxy.js
