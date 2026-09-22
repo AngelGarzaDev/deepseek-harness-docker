@@ -29,7 +29,7 @@ RUN chmod 755 /usr/local/bin/entrypoint.sh
 
 # ── Switch to non-root user ─────────────────────────────────────────────────
 USER dshuser
-ENV HOME=/home/dshuser
+
 
 # ── Ports ────────────────────────────────────────────────────────────────────
 EXPOSE 3000
