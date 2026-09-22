@@ -1,12 +1,8 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# DeepSeek Harness — Runtime-only Docker image (with socat for proxying)
+# DeepSeek Harness — Runtime-only Docker image (Docker host ports DSH)
 # Uses pre-published npm packages; NO source compilation inside the container.
 # ──────────────────────────────────────────────────────────────────────────────
 FROM node:22-slim
-
-# Install socat for the entrypoint proxy bridge
-RUN apt-get update && apt-get install -y --no-install-recommends socat \
-    && rm -rf /var/lib/apt/lists/*
 
 LABEL org.opencontainers.image.source=https://github.com/deepseek-ai/deepseek-harness
 LABEL org.opencontainers.image.title="DeepSeek Harness"
@@ -22,14 +18,13 @@ RUN addgroup --system --gid 1001 dshuser \
     && mkdir -p /home/dshuser/.dsh \
     && chown -R dshuser:dshuser /home/dshuser
 
-# ── Copy entrypoint and proxy script (as root) ───────────────────────────────
+# ── Copy entrypoint (as root) ─────────────────────────────────────────────────
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY proxy.js /usr/local/bin/proxy.js
 RUN chmod 755 /usr/local/bin/entrypoint.sh
 
 # ── Switch to non-root user ─────────────────────────────────────────────────
 USER dshuser
-
+ENV HOME=/home/dshuser
 
 # ── Ports ────────────────────────────────────────────────────────────────────
 EXPOSE 3000
