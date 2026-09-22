@@ -1,75 +1,60 @@
-# DeepSeek Harness Docker
+# DeepSeek Harness — Runtime Docker Image
 
-Docker packaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — an AI agent framework with Web GUI, headless profiles, and native sandboxing.
-
-## Prerequisites
-
-Clone the upstream project, then apply this Dockerfile on top:
-
-```bash
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cp /path/to/dockerfile-repo/* deepseek-harness/   # Dockerfile, .dockerignore
-```
-
-Or fork and merge these files into your own copy of the repo.
+Docker packaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) using **pre-published npm packages**. No source compilation inside the container.
 
 ## Quick Start
 
 ```bash
-# From the deepseek-harness directory
+# Build locally:
+git clone https://github.com/AngelGarzaDev/deepseek-harness-docker.git
+cd deepseek-harness-docker
 docker build -t deepseek-harness .
-```
 
 # Run with Web GUI (port 3000)
 docker run -p 3000:3000 deepseek-harness
-
-# Run headless (agent-only, no webserver)
-docker run deepseek-harness --profile headless "your task here"
 ```
 
-## Image Architecture
+Open `http://localhost:3000` in your browser.
 
-The Dockerfile uses a multi-stage build optimized for size and reproducibility:
+## How It Works
 
-### Stage 1 — Builder (`node:22-bookworm`)
+### Architecture
 
-Installs compilation toolchain and builds everything:
+Single-stage, runtime-only image based on `node:22-slim` (Debian bookworm).
 
-| Package | Purpose |
-|---------|---------|
-| `build-essential` | gcc for Node-API native addon (flock) |
-| `musl-tools` | musl-gcc for static landlock-run binary |
-| `git` | `repositoryCommitHash()` needs `git rev-parse HEAD` |
-| `python3` | Required by esbuild dependency |
+#### Pre-published npm packages
 
-Build pipeline runs through `tsx scripts/build.ts`, executing three phases sequentially:
+Two packages are installed globally via `npm install -g`:
 
-1. **`build:native-system`** — C compilation of native addons (landlock-run under musl, flock addon under glibc)
-2. **`build:lib`** — TypeScript compilation + tsdown bundling for all workspace packages
-3. **`build:web`** — Vite React frontend build
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@deepseek-ai/dsh` | v0.1.5-rc.2 | CLI launcher & profiles (pre-bundled `lib/`) |
+| `@deepseek-ai/dsh-web-frontend` | v0.0.1-rc.5 | Web GUI static assets (`dist/` with HTML, CSS, JS, fonts) |
 
-A build record (`.dsh-build/client-build-environment.json`) captures environment variables bound to every built artifact by content digest.
+No source code is copied into the image. No build step runs inside the container.
 
-### Stage 2 — Production (`node:22-slim`)
+#### Non-root user
 
-Runtime-only image. Copies the complete workspace tree from the builder stage to preserve pnpm workspace symlinks, which use absolute paths (`/app/...`). The same WORKDIR across stages keeps those symlinks valid.
+Runs as `dshuser` (UID/GID 1001) with home at `/home/dshuser` and a pre-created `.dsh` subdirectory for session persistence.
 
-Security measures:
-- Non-root user (`dshuser`, UID/GID 1001)
-- Health check probing the web server
+#### Reverse proxy (socat)
+
+DSH intentionally rejects `--host 0.0.0.0` for safety reasons — it only binds to `127.0.0.1`. Since Docker's `-p` port mapping requires the server to listen on `0.0.0.0`, the image uses `socat` as a reverse proxy:
+
+```
+External request → 0.0.0.0:3000 (socat) → 127.0.0.1:3000 (dsh web)
+```
+
+This gives you external access while keeping DSH's security model intact.
 
 ## Configuration
 
 ### Port
 
-The default HTTP port is `3000`. Override via:
+The default HTTP port is `3000`. Change it via the `DSH_HTTP_PORT` environment variable:
 
 ```bash
-# Environment variable
 docker run -e DSH_HTTP_PORT=8080 -p 8080:8080 deepseek-harness
-
-# CLI flag
-docker run deepseek-harness web --config http.port=8080
 ```
 
 ### API Key
@@ -80,54 +65,70 @@ Pass your model provider API key at runtime:
 docker run -e DEEPSEEK_API_KEY=sk-... deepseek-harness
 ```
 
-For other providers, set the corresponding environment variable or pass credentials through the `--config` flag.
+For other providers, set the corresponding environment variable or configure credentials through the Web UI settings.
 
 ### Persistence
 
-Mount a volume to persist session data:
+Mount a volume to persist sessions and profile customizations:
 
 ```bash
-docker run -v dsh-data:/app/.dsh deepseek-harness
+docker run -v dsh-data:/home/dshuser/.dsh deepseek-harness
 ```
 
-### Profiles
+### Trusted Hosts
 
-| Profile | Description |
-|---------|-------------|
-| `web` (default) | Serve the Web GUI on port 3000 |
-| `headless` | Agent-only mode without webserver |
+If accessing from a non-standard hostname, declare it as trusted:
 
-## Build Options
+```bash
+docker run deepseek-harness web --trusted-host myhost.local
+```
 
-### Platform-specific build
+## Building
+
+```bash
+git clone https://github.com/AngelGarzaDev/deepseek-harness-docker.git
+cd deepseek-harness-docker
+docker build -t deepseek-harness .
+```
+
+The `.dockerignore` excludes everything except `Dockerfile` and `entrypoint.sh` — no application source is copied into the image.
+
+### Platform support
+
+The published npm packages ship `linux-x64` prebuilt native addons (`koffi`, `node-pty`). Build on x86_64 Linux for best compatibility:
 
 ```bash
 docker build --platform linux/amd64 -t deepseek-harness .
 ```
 
-### Cache mount (Docker BuildKit)
-
-The Dockerfile uses `--mount=type=cache` for the pnpm store. Enable BuildKit:
-
-```bash
-export DOCKER_BUILDKIT=1
-docker build -t deepseek-harness .
-```
+On ARM hosts, the `node:22-slim` base (bookworm) maximizes the chance of prebuilt binary compatibility, but native addons may fall back to runtime compilation requiring `gcc` and `make`.
 
 ### Image size
 
-The production stage is `node:22-slim` (~180 MB base). Total image size depends on compiled artifacts; expect ~600-800 MB final image due to the full monorepo workspace copy required for symlink integrity.
+Expected final image: ~1 GB (Node.js runtime + global npm packages + socat).
+
+## Health Check
+
+Built-in healthcheck probes `http://localhost:<port>` every 30 seconds with a 10-second start period:
+
+```bash
+docker inspect --format='{{json .State.Health}}' <container_name>
+```
 
 ## Troubleshooting
 
-### Symlink errors at runtime
+### Connection refused after starting
 
-pnpm creates absolute-path symlinks inside `/app`. If you change `WORKDIR` between stages or mount volumes over `/app`, those symlinks break. Keep the workspace at `/app` in both stages.
+Wait a few seconds — the socat proxy needs ~2 seconds to initialize after DSH starts. The healthcheck accounts for this with a 10-second start period.
 
-### Native addon failures
+### Permission denied errors
 
-Ensure `musl-tools` and `gcc` are available during the build stage. On Apple Silicon hosts, use `--platform linux/amd64` unless the native addon supports ARM.
+Ensure the container runs as the correct user. Do not override `USER dshuser` unless you also create a compatible `.dsh` directory.
 
-### Build fails with git error
+### Native addon load failures
 
-The build script calls `git rev-parse HEAD`. Git must be installed in the builder stage (included by default). If you clone the repo without git history (e.g., `--depth 1`), this may fail depending on the script implementation.
+If `koffi` or `node-pty` fail to load their prebuilt binaries, ensure the container platform matches what the npm package expects (`linux-x64`). Check logs:
+
+```bash
+docker logs <container>
+```
