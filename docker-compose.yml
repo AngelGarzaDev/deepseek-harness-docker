@@ -12,6 +12,8 @@ services:
       - DSH_INTERNAL_PORT=3001
       - DSH_WEB_LOG=/root/.dsh-web.log
       - DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
+    ports:
+      - "3001:3001"
 
   dsh-proxy:
     build: ./sidecar

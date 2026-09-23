@@ -8,6 +8,18 @@ const proxy = httpProxy.createProxyServer({
   target: TARGET_ORIGIN,
   ws: true,
   changeOrigin: true,
+  onProxyReq: (proxyReq, req, res) => {
+    // DSH /api Host fence: Host must be loopback (or a --trusted-host entry),
+    // and an Origin header, if present, must match Host. The sidecar sits
+    // between the browser and loopback-only DSH, so present the request as
+    // coming from loopback and drop browser markers that would conflict.
+    proxyReq.headers['host'] = '127.0.0.1:3001';
+    delete proxyReq.headers['origin'];
+    delete proxyReq.headers['referer'];
+    delete proxyReq.headers['sec-fetch-site'];
+
+    console.log(`[sidecar] Request: ${req.method} ${req.url}`);
+  }
 });
 
 proxy.on('error', (err, req, res) => {
@@ -19,13 +31,6 @@ proxy.on('error', (err, req, res) => {
 });
 
 const server = http.createServer((req, res) => {
-  // Ensure host header matches target origin to avoid 403s
-  try {
-    req.headers['host'] = new URL(req.url, TARGET_ORIGIN).hostname;
-  } catch (e) {
-    // Fallback if URL parsing fails
-    req.headers['host'] = new URL(TARGET_ORIGIN).hostname;
-  }
   proxy.web(req, res);
 });
 
