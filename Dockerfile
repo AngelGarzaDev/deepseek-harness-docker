@@ -3,13 +3,13 @@
 # Simple setup: no proxy, no socat, just dsh web on localhost.
 FROM node:22-slim
 
-LABEL org.opencontainers.image.source=https://github.com/deepseek-ai/deepseek-harness
+LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
 LABEL org.opencontainers.image.title="DeepSeek Harness"
 LABEL org.opencontainers.image.vendor="DeepSeek"
 LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pre-published npm packages via npx"
 
-# Pre-publish npm packages
-RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend
+# Pre-publish npm packages + dependencies
+RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
 
 # Non-root user
 RUN addgroup --system --gid 1001 dshuser \
@@ -24,6 +24,10 @@ RUN chmod 755 /usr/local/bin/entrypoint.sh
 # Switch to non-root user
 USER dshuser
 ENV HOME=/home/dshuser
+ENV DSH_HTTP_PORT=3000
+ENV DSH_INTERNAL_PORT=3079
+ENV DSH_WEB_LOG=/home/dshuser/.dsh-web.log
+ENV DSH_TOKEN_FILE_AUTO=/home/dshuser/.dsh-launch-token
 
 # Ports
 EXPOSE 3000
