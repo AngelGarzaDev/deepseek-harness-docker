@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 
 WORKDIR /app
 
-# Install system dependencies (Build + Runtime)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -34,6 +34,7 @@ RUN chmod +x ./entrypoint.sh
 # Setup environment variables
 ENV HOME=/root
 ENV DSH_HTTP_PORT=3000
+ENV DSH_INTERNAL_PORT=3001
 ENV DSH_WEB_LOG=/root/.dsh-web.log
 ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
 ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
@@ -41,10 +42,10 @@ ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # Ensure landlock-run is linked if it exists
 RUN ln -sf /usr/local/bin/landlock-run /usr/bin/landlock-run || true
 
-# Expose the port
+# Expose ports
 EXPOSE 3000
 
-# Healthcheck
+# Healthcheck (via proxy, which forwards to DSH on loopback)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:'+(process.env.DSH_HTTP_PORT||'3000')).then(()=>process.exit(0)).catch(()=>process.exit(1))"
 

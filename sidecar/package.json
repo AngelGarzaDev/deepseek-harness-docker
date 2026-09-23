@@ -1,0 +1,9 @@
+{
+  "name": "dsh-sidecar-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sidecar proxy for DSH — handles Host-header rewriting for the /api security fence",
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}
