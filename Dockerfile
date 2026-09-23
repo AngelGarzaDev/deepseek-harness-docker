@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libncursesw5 \
     libudev1 \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
