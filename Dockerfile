@@ -30,6 +30,7 @@ RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next
 # Copy project files
 COPY . .
 RUN chmod +x ./entrypoint.sh
+RUN npm install --prefix /app/sidecar --no-audit --no-fund
 
 # Setup environment variables
 ENV HOME=/root
