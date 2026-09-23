@@ -22,22 +22,11 @@ Single-stage, runtime-only image based on `node:24` (Debian bookworm).
 
 #### Components
 
-- **Pre-published npm packages**: Two core packages are installed globally via `npm install -g`:
-  - `@deepseek-ai/dsh` (CLI launcher & profiles)
-  - `@deepseek-ai/dsh-web-frontend` (Web GUI static assets)
+- **Pre-published npm packages**: The core package `@deepseek-ai/dsh` is installed globally via `npm install -g`.
 
-- **Custom Application Proxy**: Instead of a simple TCP bridge (like `socat`), this image includes a custom Node.js proxy layer located in `/app/proxy/`. This layer provides:
-  - **Auto-Authentication**: Automatically scrapes logs for launch tokens and manages session cookies.
-  - **Header Management**: Ensures proper host headers and CORS compliance.
-  - **Compression Support**: Handles Gzip, Deflate, and Brotli transparently.
-  - **Cross-Origin Compatibility**: Resolves common connectivity issues between browsers and remote hosts.
+### Security Model
 
-#### Security Model
-DSH intentionally rejects `--host 0.0.0.0` for safety reasons—it only binds to `127.0.0.1`. To allow external access via Docker's `-p` port mapping (which requires listening on `0.0.0.0`), the Node.js proxy bridges traffic:
-
-External Request (Host:3001) → Node.js Proxy (Container:3000) → DSH Internal (127.0.0.1:3079)
-
-This gives you external access while keeping DSH's security model intact.
+DSH binds to `0.0.0.0` within the container to allow external access via Docker's `-p` port mapping. Traffic is routed directly to the DSH service.
 
 ## Configuration
 
@@ -46,7 +35,7 @@ This gives you external access while keeping DSH's security model intact.
 By default, the container exposes port `3000` internally, which is mapped to `3001` in the provided `docker-compose.yml`. You can change these via environment variables:
 
 ```bash
-# Example: Map external 8080 to internal 3000 (proxy)
+# Example: Map external 8080 to internal 3000
 docker run -e DSH_HTTP_PORT=3000 -p 8080:3000 deepseek-harness
 ```
 
@@ -84,7 +73,7 @@ cd deepseek-harness-docker
 docker build -t deepseek-harness .
 ```
 
-The `.dockerignore` manages artifacts while ensuring the necessary proxy scripts and `entrypoint.sh` are included in the final image.
+The `.dockerignore` manages artifacts while ensuring the necessary scripts are included in the final image.
 
 ### Platform support
 
@@ -98,7 +87,7 @@ On ARM hosts, the `node:24` base (bookworm) maximizes the chance of prebuilt bin
 
 ### Image size
 
-Expected final image: ~1 GB (Node.js runtime + global npm packages + proxy scripts).
+Expected final image: ~1 GB (Node.js runtime + global npm packages).
 
 ## Health Check
 
@@ -112,7 +101,7 @@ docker inspect --format='{{json .State.Health}}' <container_name>
 
 ### Connection refused after starting
 
-Wait a few seconds — the Node.js proxy needs ~2 seconds to initialize after DSH starts. The healthcheck accounts for this with a 10-second start period.
+Wait a few seconds — the Node.js service needs time to initialize after startup. The healthcheck accounts for this with a 10-second start period.
 
 ### Permission denied errors
 

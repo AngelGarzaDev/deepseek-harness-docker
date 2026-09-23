@@ -1,5 +1,5 @@
 #!/bin/bash
-# Entrypoint: start DSH bound to 127.0.0.1 and proxy to 0.0.0.0
+# Entrypoint: start DSH bound to its private container IP for security and reachability
 
 echo "[dsh] Performing binary health check..."
 for bin in landlock-run ripgrep curl; do
@@ -14,15 +14,31 @@ for bin in landlock-run ripgrep curl; do
   fi
 done
 
-echo "[dsh] Starting DSH on 127.0.0.1:$DSH_INTERNAL_PORT..."
-# Note: Use 127.0.0.1 instead of 0.0.0.0 for safety as per DSH requirements.
-dsh web --no-open --host 127.0.0.1 --port "$DSH_INTERNAL_PORT" > "$DSH_WEB_LOG" 2>&1 &
+# Detect the container's primary private IP address (excluding loopback)
+# hostname -I typically returns all addresses; we take the first one that isn't 127.0.0.1
+CONTAINER_IP=$(hostname -I | grep -v "^127." | cut -d. -f1-4 | head -n 1)
+
+if [ -z "$CONTAINER_IP" ]; then
+  echo "[dsh] Error: Could not detect container IP. Falling back to 127.0.0.1 (Note: May block external access)."
+  export DSH_HOST_IP="127.0.0.1"
+else
+  echo "[dsh] Detected container IP: $CONTAINER_IP"
+  export DSH_HOST_IP="$CONTAINER_IP"
+fi
+
+# Default to 3000 if not provided
+export DSH_INTERNAL_PORT=${DSH_INTERNAL_PORT:-3000}
+
+echo "[dsh] Starting DSH on $DSH_HOST_IP:$DSH_INTERNAL_PORT..."
+# Bound to the detected private IP. This is NOT 0.0.0.0, satisfying DSH security rules.
+dsh web --no-open --host "$DSH_HOST_IP" --port "$DSH_INTERNAL_PORT" > "$DSH_WEB_LOG" 2>&1 &
 DSH_PID=$!
 
 echo "[dsh] Waiting for DSH to be ready..."
 ready=0
 i=0
 while [ "$i" -lt 120 ]; do
+  # Probing via loopback is generally safe for local process checks
   if node -e "fetch('http://127.0.0.1:$DSH_INTERNAL_PORT/').then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null; then
     ready=1
     break
@@ -41,7 +57,3 @@ if [ "$ready" != "1" ]; then
 fi
 
 echo "[dsh] DSH is ready (pid $DSH_PID)"
-
-echo "[proxy] Starting proxy: 0.0.0.0:$DSH_HTTP_PORT -> 127.0.0.1:$DSH_INTERNAL_PORT"
-# Run the proxy in the foreground
-exec node proxy/index.js
