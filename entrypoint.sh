@@ -1,11 +1,9 @@
 #!/bin/bash
 # Entrypoint: start DSH bound to 127.0.0.1 and proxy to 0.0.0.0
 
-export HOME="/home/dshuser"
-
 echo "[dsh] Starting DSH on 127.0.0.1:$DSH_INTERNAL_PORT..."
 # Note: Use 127.0.0.1 instead of 0.0.0.0 for safety as per DSH requirements.
-dsh web --no-open --host 127.0.0.1 --port "$DSH_INTERNAL_PORT" > /home/dshuser/.dsh-web.log 2>&1 &
+dsh web --no-open --host 127.0.0.1 --port "$DSH_INTERNAL_PORT" > "$DSH_WEB_LOG" 2>&1 &
 DSH_PID=$!
 
 echo "[dsh] Waiting for DSH to be ready..."

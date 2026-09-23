@@ -1,4 +1,20 @@
-FROM node:22-slim
+# Stage 1: Build & Compile Native Modules
+FROM node:24-slim AS builder
+
+WORKDIR /app
+
+# Install build tools for node-pty
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# Copy all files
+COPY . .
+
+# Install DSH and proxy dependencies in one go to potentially speed up
+RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next && \
+    cd proxy && npm install --no-audit --no-fund
+
+# Stage 2: Runtime Image
+FROM node:24-slim
 
 LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
 LABEL org.opencontainers.image.title="DeepSeek Harness"
@@ -7,37 +23,30 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 
 WORKDIR /app
 
-# Copy project files first so npm knows where to put things
-COPY . .
+# Copy Node.js binaries and global modules from builder
+COPY --from=builder /usr/local/ /usr/local/
 
-# Install all required dependencies locally
-# This avoids global registry issues and ensures they are available to our scripts
-RUN npm install @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
+# Copy project files
+COPY --from=builder /app/proxy/ ./proxy/
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 
-# Non-root user setup
-RUN groupadd -r dshuser && useradd -r -g dshuser -m -d /home/dshuser dshuser \
-    && mkdir -p /home/dshuser/.dsh \
-    && chown -R dshuser:dshuser /home/dshuser /app
-
-# Setup entrypoint
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod 755 /usr/local/bin/entrypoint.sh
-
-# Switch to non-root user
-USER dshuser
-ENV HOME=/home/dshuser
+# Setup environment
+ENV HOME=/root
+ENV PROXY_PORT=3000
+ENV DSH_PORT=3079
 ENV DSH_HTTP_PORT=3000
 ENV DSH_INTERNAL_PORT=3079
-ENV DSH_WEB_LOG=/home/dshuser/.dsh-web.log
-ENV DSH_TOKEN_FILE_AUTO=/home/dshuser/.dsh-launch-token
+ENV DSH_WEB_LOG=/root/.dsh-web.log
+ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
+ENV PATH="/app/node_modules:.bin:/usr/local/bin:${PATH}"
 
-# Ports
+# Prepare entrypoint
+RUN chmod +x ./entrypoint.sh
+
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:'+(process.env.DSH_HTTP_PORT||'3000')).then(()=>process.exit(0)).catch(()=>process.exit(1))"
 
-# Entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]
 CMD []

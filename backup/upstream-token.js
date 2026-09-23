@@ -1,14 +1,14 @@
-// Upstream Auto-Authorization (Forward compatible with official DSH 0.1.2+ launch-token mechanism).
+// 上游自动授权（前向兼容官方 DSH 0.1.2+ 的 launch-token 机制）。
 //
-// Design Goal: tokens are fully handled by this image; LAN users authenticated via Basic Auth won't need extra steps.
-// Key Point: Never inject tokens on every forward - the official model is "launch token exchanges for browser session cookies".
-// If injected on every request, the upstream would issue a brand-new identity for every request, causing session mismatch.
+// 设计目标：token 完全由本镜像处理，LAN 用户经 Basic Auth 通过后，不再需要任何额外动作。
+// 关键点：绝不在每次转发时注入 token——官方模型是「launch token 换取浏览器会话 cookie」，
+// 若每请求都带 token，上游会为每个请求签发一个全新身份，出现身份错乱。
 const fs = require('fs');
 
 const LOG_FILE = process.env.DSH_WEB_LOG || '/app/.dsh-web.log';
 const TOKEN_FILE_AUTO = process.env.DSH_TOKEN_FILE_AUTO || '/app/.dsh-launch-token';
-// Official DSH 0.1.2+ launch tokens are passed via "?token=" on the homepage URL (see dsh web prints)
-// to exchange for a session cookie; they don't accept tokens in request headers, so we append it as a query param here.
+// 官方 DSH 0.1.2+ 的 launch token 通过「首页 URL 上的 ?token=」传入（见 dsh web 打印的
+// 地址格式），换取会话 cookie；不接受把 token 放请求头，因此这里用 query 追加。
 const TOKEN_QUERY_KEY = process.env.DSH_TOKEN_QUERY_KEY || 'token';
 
 const HARD_TOKEN = process.env.DSH_TOKEN || '';
@@ -39,8 +39,8 @@ function readTail(p, maxBytes) {
   }
 }
 
-// Returns the [last] match of the regex in the text (the logs might contain multiple old tokens printed at startup,
-// the newer ones are further back, so taking the last match gives the current latest token), returns null if no match.
+// 返回文本中 regex 的【最后一个】匹配（日志里可能有多次启动打印的旧 token，
+// 越新的打印越靠后，取最后一个即当前最新 token），无匹配返回 null。
 function lastMatch(text, regex) {
   let re;
   try {
@@ -57,14 +57,14 @@ function lastMatch(text, regex) {
   return last;
 }
 
-// Token masking: keep only the first and last 4 characters, fill middle with *, facilitates log debugging without leaking full token.
+// token 去敏：仅保留头尾 4 个字符，中间用 * 填充，便于日志排查又不泄露完整 token
 function maskToken(t) {
   const s = String(t || '');
   if (s.length <= 8) return s ? s.slice(0, 1) + '****' : '(empty)';
   return s.slice(0, 4) + '****' + s.slice(-4);
 }
 
-// Extract the latest (trailing) launch token from the logs.
+// 从日志文本中提取最新（末尾）的 launch token
 function extractFromText(text) {
   if (PATTERN) {
     const m = lastMatch(text, PATTERN);
@@ -74,7 +74,7 @@ function extractFromText(text) {
   return m ? m[1] : null;
 }
 
-// One-time scan: Read trailing part of DSH logs to extract token, write to TOKEN_FILE_AUTO if hit.
+// 打捞一次：读 DSH 日志尾部提取 token，命中则落盘到 TOKEN_FILE_AUTO
 function scanOnce() {
   const token = extractFromText(readTail(LOG_FILE, 512 * 1024));
   if (token) {
@@ -83,7 +83,7 @@ function scanOnce() {
     state.token = t;
     state.source = 'auto';
     state.done = true;
-    console.log(`[upstream-token] Automatically captured DSH launch token (length ${t.length}), used only to exchange session during root 401`);
+    console.log(`[upstream-token] 已自动捕获 DSH launch token（长度 ${t.length}），仅用于根目录 401 时换取会话`);
     return t;
   }
   return null;
@@ -97,7 +97,7 @@ function readHardToken() {
   return '';
 }
 
-// Ensure token is obtained: manual priority, then auto-scraping (starts periodic polling if necessary).
+// 确保已拿到 token：优先手工，其次自动打捞（必要时启动周期性轮询）
 function ensureToken() {
   if (state.done && state.token) return state.token;
   const hard = readHardToken();
@@ -128,7 +128,7 @@ function ensureToken() {
   return state.token;
 }
 
-// Version detection: for diagnostics and future per-version logic refinement; generally not needed now.
+// 版本探测：供诊断与后续按版本细化判断；一般不需要
 const VERSION_PATHS = [
   process.env.DSH_VERSION,
   '/usr/local/lib/node_modules/@deepseek-ai/dsh/package.json',
@@ -146,7 +146,7 @@ function detectDshVersion() {
   return null;
 }
 
-// --- Root Directory Authorization Guide (401 -> Retry with token -> Forward set-cookie) ---
+// ── 根目录授权引导（401 → 带 token 重发 → 透传 set-cookie）─────────
 const FORWARD_HEADERS = [
   'accept', 'accept-language', 'user-agent', 'cookie', 'referer',
   'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site',
@@ -157,8 +157,8 @@ function pickIndexHeaders(req, dropCookie) {
   const out = { accept: '*/*', 'accept-encoding': 'identity' };
   for (let i = 0; i < FORWARD_HEADERS.length; i++) {
     const n = FORWARD_HEADERS[i];
-    // token exchange = new session; if browser provides expired/invalid cookies,
-    // upstream may directly return 401 due to failed validation. Therefore, strip them during retry.
+    // token 交换 = 换取全新会话；浏览器若带旧 cookie（过期/无效会话），
+    // 上游会因 cookie 校验失败直接 401，导致重发永远失败。因此重发时剥离。
     if (dropCookie && n === 'cookie') continue;
     if (src[n]) out[n] = src[n];
   }
@@ -177,7 +177,7 @@ async function fetchRaw(origin, headers, path) {
   };
 }
 
-// Inject a script into the HTML content after the first <head> tag (or at start if none exists).
+// 把 HTML 内容注入一段脚本，插入到第一个 <head> 之后（无则插到最前）。
 function injectIntoHead(content, snippet) {
   const i = content.toLowerCase().indexOf('<head');
   if (i !== -1) {
@@ -187,7 +187,7 @@ function injectIntoHead(content, snippet) {
   return snippet + content;
 }
 
-// Forward entire upstream response to browser (preserve set-cookie for session creation; modify injected html).
+// 把上游响应整体透传给浏览器（保留 set-cookie 供浏览器建立会话；对 html 做注入改写）。
 function sendRaw(r, res, transformHtml) {
   const hs = {};
   for (const [k, v] of r.headers) {
@@ -201,7 +201,7 @@ function sendRaw(r, res, transformHtml) {
   let body = r.body;
   const ct = String(r.headers.get ? r.headers.get('content-type') : '').toLowerCase();
   if (ct.includes('text/html') && transformHtml) body = transformHtml(body);
-  // Responses with 3xx/empty bodies (like 303 redirects) do not set Content-Type to avoid misleading the browser into treating them as HTML
+  // 3xx/空 body 的响应（如 303 重定向）不设 Content-Type，避免误导浏览器按 HTML 处理
   if (body && body.length) {
     hs['Content-Type'] = ct || 'text/html; charset=utf-8';
   }
@@ -211,9 +211,9 @@ function sendRaw(r, res, transformHtml) {
   return true;
 }
 
-// Handle root GET: forward normally; if upstream returns 401, retry once with launch token,
-// and forward the resulting set-cookie to the browser, allowing the browser to follow automatically.
-// Return true if response was handled, false if anomaly occurred (caller should fall back to plain proxy).
+// 处理根目录 GET：正常情况下直接转发；上游返回 401 时携带 launch token 重发一次，
+// 并把上游（重试）返回的 set-cookie 透传给浏览器，此后浏览器自动携带 cookie 通过认证。
+// 返回 true 表示已接管响应；返回 false 表示出现异常，调用方应回退到普通反向代理。
 async function serveIndex(req, res, ctx) {
   const origin = ctx.origin;
   const transformHtml = ctx.transformHtml;
@@ -227,30 +227,30 @@ async function serveIndex(req, res, ctx) {
   if (first.status === 401) {
     const token = ensureToken();
     if (token) {
-      console.log(`[upstream-token] Root directory initial request returned 401, attempting to retry with launch token (${maskToken(token)}) to exchange for session cookie`);
-      // Official format: append launch token to the root directory URL's query to exchange for an upstream session cookie
+      console.log(`[upstream-token] 根目录首次请求返回 401，尝试携带 launch token（${maskToken(token)}）重发以换取会话 cookie`);
+      // 官方格式：把 launch token 追加进根目录 URL 的 query，换取上游会话 cookie
       const sep = reqUrl.includes('?') ? '&' : '?';
       const authUrl = `${reqUrl}${sep}${TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`;
       let retry;
-      // Retrying is "exchanging for a new session"; must strip old browser cookies, otherwise upstream may return 401 due to invalid cookies
+      // 重发是「换取全新会话」，必须剥离浏览器旧 cookie，否则上游可能因无效 cookie 直接 401
       try { retry = await fetchRaw(origin, pickIndexHeaders(req, true), authUrl); } catch { retry = null; }
       if (retry) {
         const sc = retry.setCookies.length;
-        console.log(`[upstream-token] Retry with token -> Upstream returned ${retry.status}, issued ${sc} session cookies`);
+        console.log(`[upstream-token] 携带 token 重发 → 上游返回 ${retry.status}，下发 ${sc} 个会话 cookie`);
         if (retry.status === 401) {
-          console.log(`[upstream-token] Auto-login failed: Retry with launch token (${maskToken(token)}) still returned 401 (token may be expired/invalid, or upstream version doesn't support query token method)`);
+          console.log(`[upstream-token] 自动登录失败：携带 launch token（${maskToken(token)}）重发仍返回 401（token 可能已过期/失效，或该上游版本不支持 query token 方式）`);
         } else if (retry.status >= 300 && retry.status < 400) {
           const loc = String(retry.headers.get ? retry.headers.get('location') : retry.headers.location || '');
-          console.log(`[upstream-token] Auto-login successful: Upstream ${retry.status} redirected to "${loc || '/'}", issued ${sc} session cookies, forwarded for browser to follow automatically`);
+          console.log(`[upstream-token] 自动登录成功：上游 ${retry.status} 重定向到「${loc || '/'}」，下发 ${sc} 个会话 cookie，透传后由浏览器自动跟随并携带 cookie`);
         }
         return sendRaw(retry, res, transformHtml);
       }
-      console.log('[upstream-token] Retry with token failed (network error or no upstream response), falling back to forwarding initial 401');
+      console.log('[upstream-token] 携带 token 重发失败（网络异常或上游无响应），回退透传首次 401');
     } else {
-      console.log('[upstream-token] Launch token not obtained, skipping retry, forwarding initial 401');
+      console.log('[upstream-token] 未获取到 launch token，跳过重发，透传首次 401');
     }
   } else if (first.status !== 200) {
-    console.log(`[upstream-token] Root directory initial request returned ${first.status} (not 401), forwarding directly`);
+    console.log(`[upstream-token] 根目录首次请求返回 ${first.status}（非 401），直接透传`);
   }
   return sendRaw(first, res, transformHtml);
 }

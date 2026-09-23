@@ -1,23 +1,27 @@
-#!/bin/sh
-# 応答体圧縮兼容管线：解压 → 改写 → 重压。
-#
-# 背景：DSH 0.1.2+ 的 web server 默认开启 gzip（compression: gzip），压缩后的响应
-# 是二进制字节流，任何基于明文字符串的改写（HTML polyfill 注入、isLoopbackHostname
-# 替换）都无法匹配。上一版方案是转发时剥离 Accept-Encoding、强制上游返回明文，
-# 依赖「上游遵循 HTTP 协商」这一前提。
-#
-# 本模块改为完整兼容浏览器/上游的所有压缩形态（gzip / deflate / br，以及不压缩的
-# identity）：转发时保留上游的压缩响应，缓冲完整 body → 按 Content-Encoding 解压成
-# 明文 → 执行改写 → 再按原编码重压回传。这样无论上游是否压缩、压缩成哪种格式，
-# 改写逻辑都能生效；遇到不支持的编码（如 zstd）或解压失败时，原样透传、绝不破坏响应。
+// Response body compression compatibility pipeline: Decompress -> Transform -> Recompress.
+//
+// Background: DSH 0.1.2+ web servers enable gzip by default (compression: gzip). Compressed responses
+// are binary byte streams, making any transformations based on plain strings (e.g., HTML polyfills,
+// isLoopbackHostname replacement) impossible to match. Previous solutions involved stripping Accept-Encoding
+// during forwarding and forcing upstream to return plaintext, relying on "upstream following HTTP negotiation".
+//
+// This module provides full compatibility with all browser/upstream compression types (gzip / deflate / br,
+// as well as uncompressed identity): Forwarding retains the upstream's original compression format,
+// buffers the complete body -> decompresses into plaintext via Content-Encoding -> executes transformation ->
+// re-compresses back using the original encoding. This ensures transformation logic works regardless of whether
+// the upstream used compression or what type it was; if an unsupported codec (like zstd) is met or decompression
+// fails, the response is forwarded as-is without being corrupted.
 const zlib = require('zlib');
 
+// Parse encoding from Content-Encoding header. May be "gzip", "br", "gzip, br"; takes first valid value.
+// Empty/identity means uncompressed. If unrecognizable, returns the original string (treated as unsupported by caller).
 function parseEncoding(ce) {
   if (!ce) return 'identity';
   const first = String(ce).split(',')[0].trim().toLowerCase();
   return first || 'identity';
 }
 
+// Decompress into plaintext. Identity returns original buffer; supports gzip/deflate/br; others or failures return null.
 function decompress(buf, encoding) {
   if (!encoding || encoding === 'identity') return buf;
   try {
@@ -25,6 +29,7 @@ function decompress(buf, encoding) {
       case 'gzip':
         return zlib.gunzipSync(buf);
       case 'deflate':
+        // Prefer standard zlib wrapper; some servers send raw deflate (RFC 1951), fall back after failure
         try {
           return zlib.inflateSync(buf);
         } catch {
@@ -33,13 +38,14 @@ function decompress(buf, encoding) {
       case 'br':
         return zlib.brotliDecompressSync(buf);
       default:
-        return null;
+        return null; // Unsupported codecs (e.g. zstd) -> Cannot transform
     }
   } catch {
     return null;
   }
 }
 
+// Recompress using original encoding. Identity returns original buffer; supports gzip/deflate/br; others or failures return null.
 function recompress(buf, encoding) {
   if (!encoding || encoding === 'identity') return buf;
   try {
@@ -58,6 +64,13 @@ function recompress(buf, encoding) {
   }
 }
 
+// Attach the [buffer -> decompress -> transform(plaintext) -> recompress -> output] pipeline to res,
+// used by http-proxy's proxyRes event. Since length changes after transformation, we delete content-length and send as chunked.
+//   transform(plainBuffer) -> returns transformed Buffer; returns null if no transformation needed (forward as-is).
+// Fallback strategy (ensures response integrity in all cases):
+//   - Upstream compressed but decompression fails / unsupported codec -> forward compressed bytes as-is, keeping upstream's Content-Encoding;
+//   - Transformation succeeded but recompression failed -> fallback to plaintext sending and remove Content-Encoding, letting browser read as plaintext;
+//   - Uncompressed (identity) -> direct transformation, no compression overhead.
 function attachBodyTransform(res, proxyRes, transform) {
   const encoding = parseEncoding(proxyRes.headers['content-encoding']);
   delete proxyRes.headers['content-length'];
@@ -87,9 +100,9 @@ function attachBodyTransform(res, proxyRes, transform) {
       if (rewritten !== null) {
         const compressed = recompress(rewritten, encoding);
         if (compressed !== null) {
-          out = compressed;
+          out = compressed; // Decompress -> Transform -> Recompress success, Content-Encoding remains original
         } else {
-          out = rewritten;
+          out = rewritten; // Recompression failed: fallback to plaintext, must remove Content-Encoding otherwise browser decodes garbage
           delete proxyRes.headers['content-encoding'];
         }
       }
