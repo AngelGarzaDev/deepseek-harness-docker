@@ -4,7 +4,13 @@ FROM node:24-slim AS builder
 WORKDIR /app
 
 # Install build tools for node-pty
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    libncursesw5 \
+    libudev1 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy all files
 COPY . .
@@ -42,6 +48,12 @@ ENV PATH="/app/node_modules:.bin:/usr/local/bin:${PATH}"
 
 # Prepare entrypoint
 RUN chmod +x ./entrypoint.sh
+
+# Install runtime dependencies for node-pty and others
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libncursesw5 \
+    libudev1 \
+    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
 
