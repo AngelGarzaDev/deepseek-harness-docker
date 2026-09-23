@@ -15,10 +15,11 @@ proxy.on('proxyReq', (proxyReq, req, res) => {
   // and an Origin header, if present, must match Host. The sidecar sits
   // between the browser and loopback-only DSH, so present the request as
   // coming from loopback and drop browser markers that would conflict.
-  proxyReq.headers['host'] = '127.0.0.1:3001';
-  delete proxyReq.headers['origin'];
-  delete proxyReq.headers['referer'];
-  delete proxyReq.headers['sec-fetch-site'];
+  // proxyReq is a http.ClientRequest — use setHeader/removeHeader, not .headers.
+  proxyReq.setHeader('host', '127.0.0.1:3001');
+  proxyReq.removeHeader('origin');
+  proxyReq.removeHeader('referer');
+  proxyReq.removeHeader('sec-fetch-site');
 
   console.log(`[sidecar] Request: ${req.method} ${req.url}`);
 });
