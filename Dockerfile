@@ -3,7 +3,7 @@
 
 FROM node:24
 
-LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
+LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker.git
 LABEL org.opencontainers.image.title="DeepSeek Harness"
 LABEL org.opencontainers.image.vendor="DeepSeek"
 LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pre-published npm packages via npx"
@@ -34,9 +34,8 @@ RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next
 COPY . .
 
 # Install project-specific dependencies
-# These are installed into /app/proxy and /app/manager respectively
+# Only the proxy directory is present in this repository
 RUN cd proxy && npm install --omit=dev --no-audit --no-fund
-RUN cd manager && npm install --omit=dev --no-audit --no-fund
 
 # Setup environment variables
 ENV HOME=/root
