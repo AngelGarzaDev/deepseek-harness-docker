@@ -20,30 +20,24 @@ Open `http://localhost:3000` in your browser.
 
 ### Architecture
 
-Single-stage, runtime-only image based on `node:22-slim` (Debian bookworm).
+Single-stage, runtime-only image based on `node:24-slim` (Debian bookworm).
 
-#### Pre-published npm packages
+#### Components
 
-Two packages are installed globally via `npm install -g`:
+- **Pre-published npm packages**: Two core packages are installed globally via `npm install -g`:
+  - `@deepseek-ai/dsh` (CLI launcher & profiles)
+  - `@deepseek-ai/dsh-web-frontend` (Web GUI static assets)
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `@deepseek-ai/dsh` | v0.1.5-rc.2 | CLI launcher & profiles (pre-bundled `lib/`) |
-| `@deepseek-ai/dsh-web-frontend` | v0.0.1-rc.5 | Web GUI static assets (`dist/` with HTML, CSS, JS, fonts) |
+- **Custom Application Proxy**: Instead of a simple TCP bridge (like `socat`), this image includes a custom Node.js proxy layer located in `/app/proxy/`. This layer provides:
+  - **Auto-Authentication**: Automatically scrapes logs for launch tokens and manages session cookies.
+  - **Header Management**: Ensures proper host headers and CORS compliance.
+  - **Compression Support**: Handles Gzip, Deflate, and Brotli transparently.
+  - **Cross-Origin Compatibility**: Resolves common connectivity issues between browsers and remote hosts.
 
-No source code is copied into the image. No build step runs inside the container.
+#### Security Model
+DSH intentionally rejects `--host 0.0.0.0` for safety reasons—it only binds to `127.0.0.1`. To allow external access via Docker's `-p` port mapping (which requires listening on `0.0.0.0`), the Node.js proxy bridges traffic:
 
-#### Non-root user
-
-Runs as `dshuser` (UID/GID 1001) with home at `/home/dshuser` and a pre-created `.dsh` subdirectory for session persistence.
-
-#### Reverse proxy (socat)
-
-DSH intentionally rejects `--host 0.0.0.0` for safety reasons — it only binds to `127.0.0.1`. Since Docker's `-p` port mapping requires the server to listen on `0.0.0.0`, the image uses `socat` as a reverse proxy:
-
-```
-External request → 0.0.0.0:3000 (socat) → 127.0.0.1:3000 (dsh web)
-```
+External request → 0.0.0.0:3000 (Node.js Proxy) → 127.0.0.1:3079 (DSH Internal)
 
 This gives you external access while keeping DSH's security model intact.
 
@@ -91,7 +85,7 @@ cd deepseek-harness-docker
 docker build -t deepseek-harness .
 ```
 
-The `.dockerignore` excludes everything except `Dockerfile` and `entrypoint.sh` — no application source is copied into the image.
+The `.dockerignore` manages artifacts while ensuring the necessary proxy scripts and `entrypoint.sh` are included in the final image.
 
 ### Platform support
 
@@ -101,11 +95,11 @@ The published npm packages ship `linux-x64` prebuilt native addons (`koffi`, `no
 docker build --platform linux/amd64 -t deepseek-harness .
 ```
 
-On ARM hosts, the `node:22-slim` base (bookworm) maximizes the chance of prebuilt binary compatibility, but native addons may fall back to runtime compilation requiring `gcc` and `make`.
+On ARM hosts, the `node:24-slim` base (bookworm) maximizes the chance of prebuilt binary compatibility, but native addons may fall back to runtime compilation requiring `gcc` and `make`.
 
 ### Image size
 
-Expected final image: ~1 GB (Node.js runtime + global npm packages + socat).
+Expected final image: ~1 GB (Node.js runtime + global npm packages + proxy scripts).
 
 ## Health Check
 
@@ -119,7 +113,7 @@ docker inspect --format='{{json .State.Health}}' <container_name>
 
 ### Connection refused after starting
 
-Wait a few seconds — the socat proxy needs ~2 seconds to initialize after DSH starts. The healthcheck accounts for this with a 10-second start period.
+Wait a few seconds — the Node.js proxy needs ~2 seconds to initialize after DSH starts. The healthcheck accounts for this with a 10-second start period.
 
 ### Permission denied errors
 
