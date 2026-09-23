@@ -7,8 +7,11 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 
 WORKDIR /app
 
-# Install local dependencies (this includes both dsh and proxy)
+# Copy project files first so npm knows where to put things
 COPY . .
+
+# Install all required dependencies locally
+# This avoids global registry issues and ensures they are available to our scripts
 RUN npm install @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
 
 # Non-root user setup
