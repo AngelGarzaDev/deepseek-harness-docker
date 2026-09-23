@@ -12,7 +12,7 @@ cd deepseek-harness-docker
 docker-compose up -d
 ```
 
-Open `http://localhost:3000` in your browser.
+Open `http://localhost:3001` in your browser.
 
 ## How It Works
 
@@ -35,7 +35,7 @@ Single-stage, runtime-only image based on `node:24` (Debian bookworm).
 #### Security Model
 DSH intentionally rejects `--host 0.0.0.0` for safety reasons—it only binds to `127.0.0.1`. To allow external access via Docker's `-p` port mapping (which requires listening on `0.0.0.0`), the Node.js proxy bridges traffic:
 
-External request → 0.0.0.0:3000 (Node.js Proxy) → 127.0.0.1:3079 (DSH Internal)
+External Request (Host:3001) → Node.js Proxy (Container:3000) → DSH Internal (127.0.0.1:3079)
 
 This gives you external access while keeping DSH's security model intact.
 
@@ -43,10 +43,11 @@ This gives you external access while keeping DSH's security model intact.
 
 ### Port
 
-The default HTTP port is `3000`. Change it via the `DSH_HTTP_PORT` environment variable:
+By default, the container exposes port `3000` internally, which is mapped to `3001` in the provided `docker-compose.yml`. You can change these via environment variables:
 
 ```bash
-docker run -e DSH_HTTP_PORT=8080 -p 8080:8080 deepseek-harness
+# Example: Map external 8080 to internal 3000 (proxy)
+docker run -e DSH_HTTP_PORT=3000 -p 8080:3000 deepseek-harness
 ```
 
 ### API Key

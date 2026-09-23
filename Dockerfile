@@ -48,8 +48,7 @@ ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
 # Ensure local node_modules are prioritized
 ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
-# Prepare entrypoint script
-RUN chmod +x ./entrypoint.sh
+RUN ln -sf /usr/local/bin/landlock-run /usr/bin/landlock-run
 
 # Expose the proxy port
 EXPOSE 3000

@@ -4,7 +4,7 @@ services:
     image: deepseek-harness
     container_name: deepseek-harness
     ports:
-      - "3000:3000"
+       - "3001:3000"
     restart: unless-stopped
     volumes:
       # Maps host directory to the root home directory of the container
