@@ -32,6 +32,7 @@ RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next
 
 # Copy project files
 COPY . .
+RUN chmod +x ./entrypoint.sh
 
 # Install project-specific dependencies
 # Only the proxy directory is present in this repository
