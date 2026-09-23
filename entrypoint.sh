@@ -1,9 +1,8 @@
 #!/bin/bash
-# Entrypoint: start DSH web bound to 127.0.0.1 on port 3000.
-# Uses the "docker" profile so dsh-sandbox-local loads correctly under /home/dshuser.
+# Entrypoint: start DSH web bound to 0.0.0.0 on port 3000.
 export HOME="/home/dshuser"
 
-dsh web --no-open --host 127.0.0.1 --port 3000 &
+dsh web --no-open --host 0.0.0.0 --port 3000 &
 
 sleep 2
 exec tail -f /dev/null
