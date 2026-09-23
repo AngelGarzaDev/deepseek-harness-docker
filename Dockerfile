@@ -7,11 +7,13 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies (Build + Runtime)
+RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    gcc \
+    libc6-dev \
     libncursesw5 \
     libudev1 \
     ca-certificates \
@@ -19,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     curl \
     unzip \
+    build-essential \
+    socat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install DSH globally
@@ -32,12 +36,13 @@ RUN chmod +x ./entrypoint.sh
 ENV HOME=/root
 ENV DSH_PORT=3000
 ENV DSH_HTTP_PORT=3000
-ENV DSH_INTERNAL_PORT=3000
+ENV DSH_INTERNAL_PORT=3001
 ENV DSH_WEB_LOG=/root/.dsh-web.log
 ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
 ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
-RUN ln -sf /usr/local/bin/landlock-run /usr/bin/landlock-run
+# Ensure landlock-run is linked if it exists
+RUN ln -sf /usr/local/bin/landlock-run /usr/bin/landlock-run || true
 
 # Expose the port
 EXPOSE 3000
