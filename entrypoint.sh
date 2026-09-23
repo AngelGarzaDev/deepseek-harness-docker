@@ -1,19 +1,6 @@
 #!/bin/bash
 # Entrypoint: start DSH bound to 127.0.0.1 and proxy to 0.0.0.0
 
-echo "[dsh] Performing binary health check..."
-for bin in landlock-run ripgrep curl; do
-  if ! command -v "$bin" >/dev/null 2>&1; then
-    echo "[dsh] Warning: $bin not found in PATH. Checking /usr/local/bin..."
-    if [ -x "/usr/local/bin/$bin" ]; then
-      echo "[dsh] Found $bin in /usr/local/bin. Linking to /usr/bin/$bin."
-      ln -sf "/usr/local/bin/$bin" "/usr/bin/$bin"
-    else
-      echo "[dsh] Error: $bin not found in PATH or /usr/local/bin."
-    fi
-  fi
-done
-
 echo "[dsh] Starting DSH on 127.0.0.1:$DSH_INTERNAL_PORT..."
 # Note: Use 127.0.0.1 instead of 0.0.0.0 for safety as per DSH requirements.
 dsh web --no-open --host 127.0.0.1 --port "$DSH_INTERNAL_PORT" > "$DSH_WEB_LOG" 2>&1 &
@@ -41,14 +28,6 @@ if [ "$ready" != "1" ]; then
 fi
 
 echo "[dsh] DSH is ready (pid $DSH_PID)"
-
-# Cleanup function
-cleanup() {
-  echo "[proxy] Received exit signal, stopping DSH..."
-  kill "$DSH_PID" 2>/dev/null || true
-  wait "$DSH_PID" 2>/dev/null || true
-}
-trap cleanup EXIT INT TERM
 
 echo "[proxy] Starting proxy: 0.0.0.0:$DSH_HTTP_PORT -> 127.0.0.1:$DSH_INTERNAL_PORT"
 # Run the proxy in the foreground
