@@ -7,19 +7,20 @@ const TARGET_ORIGIN = process.env.TARGET_ORIGIN || 'http://dsh-main:3000';
 const proxy = httpProxy.createProxyServer({
   target: TARGET_ORIGIN,
   ws: true,
-  changeOrigin: true,
-  onProxyReq: (proxyReq, req, res) => {
-    // DSH /api Host fence: Host must be loopback (or a --trusted-host entry),
-    // and an Origin header, if present, must match Host. The sidecar sits
-    // between the browser and loopback-only DSH, so present the request as
-    // coming from loopback and drop browser markers that would conflict.
-    proxyReq.headers['host'] = '127.0.0.1:3001';
-    delete proxyReq.headers['origin'];
-    delete proxyReq.headers['referer'];
-    delete proxyReq.headers['sec-fetch-site'];
+  changeOrigin: true
+});
 
-    console.log(`[sidecar] Request: ${req.method} ${req.url}`);
-  }
+proxy.on('proxyReq', (proxyReq, req, res) => {
+  // DSH /api Host fence: Host must be loopback (or a --trusted-host entry),
+  // and an Origin header, if present, must match Host. The sidecar sits
+  // between the browser and loopback-only DSH, so present the request as
+  // coming from loopback and drop browser markers that would conflict.
+  proxyReq.headers['host'] = '127.0.0.1:3001';
+  delete proxyReq.headers['origin'];
+  delete proxyReq.headers['referer'];
+  delete proxyReq.headers['sec-fetch-site'];
+
+  console.log(`[sidecar] Request: ${req.method} ${req.url}`);
 });
 
 proxy.on('error', (err, req, res) => {
