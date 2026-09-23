@@ -21,7 +21,7 @@ RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next && \
     cd proxy && npm install --no-audit --no-fund
 
 # Stage 2: Runtime Image
-FROM node:24-slim
+FROM node:24
 
 LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
 LABEL org.opencontainers.image.title="DeepSeek Harness"
@@ -50,12 +50,8 @@ ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # Prepare entrypoint
 RUN chmod +x ./entrypoint.sh
 
-# Install runtime dependencies including those required for tools (bash, rg, curl, etc.)
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash \
-    ripgrep \
-    curl \
-    ca-certificates \
     libncursesw5 \
     libudev1 \
     && rm -rf /var/lib/apt/lists/*
