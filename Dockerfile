@@ -1,6 +1,3 @@
-# DeepSeek Harness — Runtime-only Docker image (Docker host ports DSH)
-# Uses pre-published npm packages; NO source compilation inside the container.
-# Simple setup: no proxy, no socat, just dsh web on localhost.
 FROM node:22-slim
 
 LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
@@ -11,11 +8,15 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 # Pre-publish npm packages + dependencies
 RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
 
+# Setup workspace
+WORKDIR /app
+COPY . .
+
 # Non-root user
 RUN addgroup --system --gid 1001 dshuser \
     && adduser --system --uid 1001 --ingroup dshuser --home /home/dshuser dshuser \
     && mkdir -p /home/dshuser/.dsh \
-    && chown -R dshuser:dshuser /home/dshuser
+    && chown -R dshuser:dshuser /home/dshuser /app
 
 # Copy entrypoint (as root)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
