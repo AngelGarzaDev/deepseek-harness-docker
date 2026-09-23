@@ -5,23 +5,16 @@ LABEL org.opencontainers.image.title="DeepSeek Harness"
 LABEL org.opencontainers.image.vendor="DeepSeek"
 LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pre-published npm packages via npx"
 
-# Set working directory first to ensure subsequent commands use it
 WORKDIR /app
 
-# Install global requirements
-RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend
-
-# Copy project files
+# Install local dependencies (this includes both dsh and proxy)
 COPY . .
+RUN npm install @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
 
 # Non-root user setup
 RUN groupadd -r dshuser && useradd -r -g dshuser -m -d /home/dshuser dshuser \
     && mkdir -p /home/dshuser/.dsh \
     && chown -R dshuser:dshuser /home/dshuser /app
-
-# Install local dependencies for the proxy logic
-# Running as root here to ensure permission consistency during build
-RUN npm install http-proxy
 
 # Setup entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
