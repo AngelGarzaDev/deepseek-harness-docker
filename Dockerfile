@@ -5,18 +5,27 @@ LABEL org.opencontainers.image.title="DeepSeek Harness"
 LABEL org.opencontainers.image.vendor="DeepSeek"
 LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pre-published npm packages via npx"
 
-# Pre-publish npm packages + dependencies
-RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
+# Install system dependencies for some potential native modules if needed later
+# But for now, we just need to ensure npm can install globally.
 
-# Setup workspace
-WORKDIR /app
-COPY . .
-
-# Non-root user
+# Use a dedicated user
 RUN addgroup --system --gid 1001 dshuser \
     && adduser --system --uid 1001 --ingroup dshuser --home /home/dshuser dshuser \
     && mkdir -p /home/dshuser/.dsh \
-    && chown -R dshuser:dshuser /home/dshuser /app
+    && chown -R dshuser:dshuser /home/dshuser
+
+# Global installation of required packages
+# We use --unsafe-perm because some global installs might fail as non-root user without it
+RUN npm install -g --omit=dev @deepseek-ai/dsh @deepseek-ai/dsh-web-frontend http-proxy
+
+# Workspace setup
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Ensure permissions on app folder
+RUN chown -R dshuser:dshuser /app
 
 # Copy entrypoint (as root)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
