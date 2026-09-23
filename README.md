@@ -18,7 +18,7 @@ Open `http://localhost:3000` in your browser.
 
 ### Architecture
 
-Single-stage, runtime-only image based on `node:24-slim` (Debian bookworm).
+Single-stage, runtime-only image based on `node:24` (Debian bookworm).
 
 #### Components
 
@@ -59,15 +59,15 @@ docker run -e DEEPSEEK_API_KEY=sk-... deepseek-harness
 
 For other providers, set the corresponding environment variable or configure credentials through the Web UI settings.
 
-### Persistence
+## Persistence
 
 Mount a volume to persist sessions and profile customizations:
 
 ```bash
-docker run -v dsh-data:/home/dshuser/.dsh deepseek-harness
+docker run -v dsh-data:/root/.dsh deepseek-harness
 ```
 
-### Trusted Hosts
+## Trusted Hosts
 
 If accessing from a non-standard hostname, declare it as trusted:
 
@@ -93,7 +93,7 @@ The published npm packages ship `linux-x64` prebuilt native addons (`koffi`, `no
 docker build --platform linux/amd64 -t deepseek-harness .
 ```
 
-On ARM hosts, the `node:24-slim` base (bookworm) maximizes the chance of prebuilt binary compatibility, but native addons may fall back to runtime compilation requiring `gcc` and `make`.
+On ARM hosts, the `node:24` base (bookworm) maximizes the chance of prebuilt binary compatibility, but native addons may fall back to runtime compilation requiring `gcc` and `make`.
 
 ### Image size
 
@@ -115,7 +115,7 @@ Wait a few seconds — the Node.js proxy needs ~2 seconds to initialize after DS
 
 ### Permission denied errors
 
-Ensure the container runs as the correct user. Do not override `USER dshuser` unless you also create a compatible `.dsh` directory.
+Ensure the container runs as the correct user. Do not override `USER root` unless you also create a compatible `.dsh` directory.
 
 ### Native addon load failures
 
