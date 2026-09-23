@@ -1,26 +1,6 @@
-# Stage 1: Build & Compile Native Modules
-FROM node:24-slim AS builder
+# DeepSeek Harness (DSH) requires Node.js; official npm package @deepseek-ai/dsh verified on Node 24.
+# This Dockerfile ensures all native dependencies (like node-pty) are correctly compiled and linked.
 
-WORKDIR /app
-
-# Install build tools for node-pty
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    make \
-    g++ \
-    libncursesw5 \
-    libudev1 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy all files
-COPY . .
-
-# Install DSH and proxy dependencies in one go to potentially speed up
-RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next && \
-    cd proxy && npm install --no-audit --no-fund
-
-# Stage 2: Runtime Image
 FROM node:24
 
 LABEL org.opencontainers.image.source=https://github.com/AngelGarzaDev/deepseek-harness-docker
@@ -30,14 +10,35 @@ LABEL org.opencontainers.image.description="DeepSeek Harness runtime — runs pr
 
 WORKDIR /app
 
-# Copy Node.js binaries and global modules from builder
-COPY --from=builder /usr/local/ /usr/local/
+# Install all system dependencies (Build + Runtime)
+# Including python3, make, g++ for compiling native modules like node-pty
+# Including libncursesw5, libudev1 for terminal handling
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    libncursesw5 \
+    libudev1 \
+    ca-certificates \
+    bash \
+    ripgrep \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install DSH globally
+# Using @next to ensure we have the latest features and fixes
+RUN npm install -g --no-audit --no-fund @deepseek-ai/dsh@next
 
 # Copy project files
-COPY --from=builder /app/proxy/ ./proxy/
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+COPY . .
 
-# Setup environment
+# Install project-specific dependencies
+# These are installed into /app/proxy and /app/manager respectively
+RUN cd proxy && npm install --omit=dev --no-audit --no-fund
+RUN cd manager && npm install --omit=dev --no-audit --no-fund
+
+# Setup environment variables
 ENV HOME=/root
 ENV PROXY_PORT=3000
 ENV DSH_PORT=3079
@@ -45,24 +46,16 @@ ENV DSH_HTTP_PORT=3000
 ENV DSH_INTERNAL_PORT=3079
 ENV DSH_WEB_LOG=/root/.dsh-web.log
 ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
+# Ensure local node_modules are prioritized
 ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
-# Prepare entrypoint
+# Prepare entrypoint script
 RUN chmod +x ./entrypoint.sh
 
-# Install additional runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash \
-    ripgrep \
-    curl \
-    ca-certificates \
-    libncursesw5 \
-    libudev1 \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
-
+# Expose the proxy port
 EXPOSE 3000
 
+# Healthcheck to verify the internal DSH service is responsive
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:'+(process.env.DSH_HTTP_PORT||'3000')).then(()=>process.exit(0)).catch(()=>process.exit(1))"
 

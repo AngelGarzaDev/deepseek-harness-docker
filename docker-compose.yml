@@ -1,6 +1,6 @@
 services:
   deepseek-harness:
-    build: https://github.com/AngelGarzaDev/deepseek-harness-docker.git
+    build: .
     image: deepseek-harness
     container_name: deepseek-harness
     ports:
