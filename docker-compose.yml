@@ -1,0 +1,13 @@
+services:
+  deepseek-harness:
+    build: https://github.com/AngelGarzaDev/deepseek-harness-docker.git
+    image: deepseek-harness
+    container_name: deepseek-harness
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - dsh-data:/home/dshuser/.dsh
+
+volumes:
+  dsh-data:

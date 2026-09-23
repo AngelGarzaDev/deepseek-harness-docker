@@ -4,14 +4,12 @@ Docker packaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 
 ## Quick Start
 
+Using `docker-compose` is the recommended way to deploy:
+
 ```bash
-# Build locally:
 git clone https://github.com/AngelGarzaDev/deepseek-harness-docker.git
 cd deepseek-harness-docker
-docker build -t deepseek-harness .
-
-# Run with Web GUI (port 3000)
-docker run -p 3000:3000 deepseek-harness
+docker-compose up -d
 ```
 
 Open `http://localhost:3000` in your browser.
