@@ -1,5 +1,5 @@
-# Exclude everything except Dockerfile, entrypoint.sh, and proxy folder for runtime-only image.
+# Exclude everything except Dockerfile, entrypoint.sh, and sidecar folder for runtime-only image.
 *
 !Dockerfile
 !entrypoint.sh
-!proxy/
+!sidecar/
