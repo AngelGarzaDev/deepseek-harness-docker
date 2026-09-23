@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     libncursesw5 \
     libudev1 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy all files
@@ -44,13 +45,17 @@ ENV DSH_HTTP_PORT=3000
 ENV DSH_INTERNAL_PORT=3079
 ENV DSH_WEB_LOG=/root/.dsh-web.log
 ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
-ENV PATH="/app/node_modules:.bin:/usr/local/bin:${PATH}"
+ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
 # Prepare entrypoint
 RUN chmod +x ./entrypoint.sh
 
-# Install runtime dependencies for node-pty and others
+# Install runtime dependencies including those required for tools (bash, rg, curl, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ripgrep \
+    curl \
+    ca-certificates \
     libncursesw5 \
     libudev1 \
     && rm -rf /var/lib/apt/lists/*
