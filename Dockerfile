@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     build-essential \
-    socat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install DSH globally
@@ -34,9 +33,7 @@ RUN chmod +x ./entrypoint.sh
 
 # Setup environment variables
 ENV HOME=/root
-ENV DSH_PORT=3000
 ENV DSH_HTTP_PORT=3000
-ENV DSH_INTERNAL_PORT=3001
 ENV DSH_WEB_LOG=/root/.dsh-web.log
 ENV DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
 ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"

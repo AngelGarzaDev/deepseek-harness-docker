@@ -7,26 +7,11 @@ services:
     volumes:
       - dsh-data:/root/.dsh
     environment:
-      - DSH_PORT=3001
       - DSH_HTTP_PORT=3000
-      - DSH_INTERNAL_PORT=3001
       - DSH_WEB_LOG=/root/.dsh-web.log
       - DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
     ports:
-      - "3001:3001"
-
-  dsh-proxy:
-    build: ./sidecar
-    image: dsh-proxy
-    container_name: dsh-proxy
-    ports:
       - "3000:3000"
-    restart: unless-stopped
-    environment:
-      - PROXY_PORT=3000
-      - TARGET_ORIGIN=http://dsh-main:3000
-    depends_on:
-      - dsh-main
 
 volumes:
   dsh-data:
