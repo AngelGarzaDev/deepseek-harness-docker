@@ -10,20 +10,22 @@ const proxy = httpProxy.createProxyServer({
   changeOrigin: true
 });
 
+// HTTP request handler — rewrites Host header for DSH /api security fence
 proxy.on('proxyReq', (proxyReq, req, res) => {
-  // DSH /api Host fence: Host must be loopback (or a --trusted-host entry),
-  // and an Origin header, if present, must match Host. The sidecar sits
-  // between the browser and loopback-only DSH, so present the request as
-  // coming from loopback and drop browser markers that would conflict.
-  // proxyReq is a http.ClientRequest — use setHeader/removeHeader, not .headers.
   proxyReq.setHeader('host', '127.0.0.1:3001');
   proxyReq.removeHeader('origin');
   proxyReq.removeHeader('referer');
   proxyReq.removeHeader('sec-fetch-site');
-
   console.log(`[sidecar] Request: ${req.method} ${req.url}`);
 });
 
+// WebSocket upgrade request — apply same Host-header rewriting before upgrade
+proxy.on('wsReq', (proxyReq) => {
+  proxyReq.setHeader('host', '127.0.0.1:3001');
+  proxyReq.removeHeader('origin');
+});
+
+// Forward WebSocket upgrade connections from server to proxy
 proxy.on('error', (err, req, res) => {
   console.error(`[sidecar] Proxy error: ${err.code || err.message}`);
   if (!res.headersSent) {
@@ -34,6 +36,12 @@ proxy.on('error', (err, req, res) => {
 
 const server = http.createServer((req, res) => {
   proxy.web(req, res);
+});
+
+// WebSocket upgrade handler — required for ws: true to work
+server.on('upgrade', (req, socket, head) => {
+  console.log(`[sidecar] WS upgrade: ${req.url}`);
+  proxy.ws(req, socket, head);
 });
 
 server.listen(LISTEN_PORT, '0.0.0.0', () => {
