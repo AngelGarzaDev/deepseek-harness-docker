@@ -50,8 +50,12 @@ ENV PATH="/app/node_modules:.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # Prepare entrypoint
 RUN chmod +x ./entrypoint.sh
 
-# Install runtime dependencies
+# Install additional runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ripgrep \
+    curl \
+    ca-certificates \
     libncursesw5 \
     libudev1 \
     && rm -rf /var/lib/apt/lists/*
