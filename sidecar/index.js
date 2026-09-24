@@ -28,6 +28,12 @@ proxy.on('proxyReqWs', (proxyReq, req, socket, options, head) => {
   proxyReq.removeHeader('origin');
   proxyReq.removeHeader('sec-websocket-origin');
   console.log(`[sidecar] WS upgrade: ${req.url} -> ${options.target.href}`);
+
+  // Guard against ECONNRESET crashes when client disconnects
+  // during non-101 responses (e.g. DSH returning 401).
+  socket.on('error', (err) => {
+    console.log(`[sidecar] WS socket error (ignored): ${err.code || err.message}`);
+  });
 });
 
 // Forward WebSocket upgrade connections from server to proxy
