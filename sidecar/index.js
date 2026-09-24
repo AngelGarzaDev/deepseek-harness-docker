@@ -6,8 +6,8 @@ const TARGET_ORIGIN = process.env.TARGET_ORIGIN || 'http://127.0.0.1:3001';
 
 const proxy = httpProxy.createProxyServer({
   target: TARGET_ORIGIN,
-  ws: true,
-  changeOrigin: true
+  ws: true
+  // No changeOrigin: we manually set Host header in proxyReq / proxyReqWs
 });
 
 // HTTP request handler — rewrites Host header for DSH /api security fence
@@ -16,13 +16,18 @@ proxy.on('proxyReq', (proxyReq, req, res) => {
   proxyReq.removeHeader('origin');
   proxyReq.removeHeader('referer');
   proxyReq.removeHeader('sec-fetch-site');
+  proxyReq.removeHeader('sec-websocket-origin');
   console.log(`[sidecar] Request: ${req.method} ${req.url}`);
 });
 
-// WebSocket upgrade request — apply same Host-header rewriting before upgrade
-proxy.on('wsReq', (proxyReq) => {
+// WebSocket upgrade — correct event is proxyReqWs (NOT wsReq).
+// changeOrigin is not set, so we must set Host here too.
+// Also strip origin headers that would mismatch the rewritten Host.
+proxy.on('proxyReqWs', (proxyReq, req, socket, options, head) => {
   proxyReq.setHeader('host', '127.0.0.1:3001');
   proxyReq.removeHeader('origin');
+  proxyReq.removeHeader('sec-websocket-origin');
+  console.log(`[sidecar] WS upgrade: ${req.url} -> ${options.target.href}`);
 });
 
 // Forward WebSocket upgrade connections from server to proxy
@@ -40,7 +45,7 @@ const server = http.createServer((req, res) => {
 
 // WebSocket upgrade handler — required for ws: true to work
 server.on('upgrade', (req, socket, head) => {
-  console.log(`[sidecar] WS upgrade: ${req.url}`);
+  console.log(`[sidecar] WS upgrade received: ${req.url}`);
   proxy.ws(req, socket, head);
 });
 
