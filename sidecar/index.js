@@ -10,10 +10,12 @@ const proxy = httpProxy.createProxyServer({
   // No changeOrigin: we manually set Host header in proxyReq / proxyReqWs
 });
 
-// HTTP request handler — rewrites Host header for DSH /api security fence
+// HTTP request handler — rewrites Host for DSH /api security fence.
+// Set Origin to the trusted target (not strip it) so SSE /api routes
+// that validate origin against host will accept the connection.
 proxy.on('proxyReq', (proxyReq, req, res) => {
   proxyReq.setHeader('host', '127.0.0.1:3001');
-  proxyReq.removeHeader('origin');
+  proxyReq.setHeader('origin', 'http://127.0.0.1:3001');
   proxyReq.removeHeader('referer');
   proxyReq.removeHeader('sec-fetch-site');
   proxyReq.removeHeader('sec-websocket-origin');
