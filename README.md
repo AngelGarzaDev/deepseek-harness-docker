@@ -59,11 +59,50 @@ docker run -v dsh-data:/root/.dsh deepseek-harness
 
 ## Trusted Hosts
 
-If accessing from a non-standard hostname, declare it as trusted:
+When accessing DSH through a reverse proxy (Cloudflare Tunnel, nginx, Caddy, etc.) the browser page origin is the proxy domain (e.g. `https://dsh.petr.ie`), not a loopback address. DSH's server-side `/api` trust fence and the client-side settings mirror both need to recognize that domain:
+
+### Environment variable — `DSH_TRUSTED_HOSTS`
+
+Comma-separated list of hostnames the DSH server should trust for the `/api` fence and the settings mirror:
 
 ```bash
-docker run deepseek-harness web --trusted-host myhost.local
+docker run \
+  -e DSH_TRUSTED_HOSTS=dsh.petr.ie \
+  -p 3000:3000 \
+  deepseek-harness
 ```
+
+Multiple hosts:
+
+```bash
+docker run \
+  -e DSH_TRUSTED_HOSTS="dsh.petr.ie,dsh.example.com:3080" \
+  -p 3000:3000 \
+  deepseek-harness
+```
+
+Each entry may include an explicit port (`host:port`) — port-less entries match any port.
+
+### docker-compose
+
+```yaml
+services:
+  dsh-main:
+    image: deepseek-harness
+    environment:
+      - DSH_TRUSTED_HOSTS=dsh.petr.ie
+    ports:
+      - "3000:3000"
+```
+
+### What this fixes
+
+The DSH web UI has two trust checks:
+
+1. **Server-side `/api` fence** — accepts requests whose `Host` header matches a `--trusted-host` entry. Without this, Cloudflare Tunnel requests get **403 Forbidden**.
+2. **Client-side settings persistence** — the `ui-settings` plugin uses `isLoopback` to decide whether to persist settings to disk or only in-memory. On non-loopback origins the settings mirror returns `"unavailable"`, making **Settings → Models** crash with *"Loading the provider directory failed: settings are unavailable in this browser"*.
+
+The sidecar proxy patches the client bundle in-flight to force `isLoopback` to `true` for all proxied access, restoring full settings functionality behind any reverse proxy. It also injects a `crypto.randomUUID()` polyfill so RPC calls work outside secure contexts.
 
 ## Building
 

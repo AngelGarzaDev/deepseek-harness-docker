@@ -11,6 +11,8 @@ services:
       - DSH_INTERNAL_PORT=3001
       - DSH_WEB_LOG=/root/.dsh-web.log
       - DSH_TOKEN_FILE_AUTO=/root/.dsh-launch-token
+      # Uncomment and set for reverse proxy / tunnel access:
+      # - DSH_TRUSTED_HOSTS=dsh.petr.ie
     ports:
       - "3000:3000"
 
